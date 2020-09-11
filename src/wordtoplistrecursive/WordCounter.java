@@ -1,7 +1,5 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+
 
 TASK DESCRIPTION:
 
@@ -20,7 +18,7 @@ a skipTag-ek közé kezdetben a style, head szavakat vesszük fel.
 
 A tag-eket rekurziv módonon dolgozza fel egy eatTag() method (paramétere lehet)
  */
-package wordtoplist;
+package wordtoplistrecursive;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -42,79 +40,82 @@ public class WordCounter {
     private final List<URL> urlList;
     private final Set<String> skipWords;
     private final Set<String> skipTags;
-    private final Set<String> tags = new HashSet<>();
+    private final Set<Character> separators;
     private final static int LENGTH_OF_TOPLIST = 10;
     private final Map<String, Integer> freq = new HashMap<>();
 
     public WordCounter(List<URL> urlList) {
         this.urlList = urlList;
-        this.skipWords = new HashSet<>(Arrays.asList("a", "and", "as", "in", "it", "of", "on", "not", "the", "to", "p", "with",
-             "href", "hreflang", "http", "https", "html"));
-        this.skipTags = new HashSet<>(Arrays.asList("head", "style")); // texts between these texts are ignored
+        this.skipWords = new HashSet<>(Arrays.asList("an", "and", "as", "by", "if", "in", "is", "it", "of", "on", "not", "that",
+                "the", "to", "with"));
+        this.skipTags = new HashSet<>(Arrays.asList("head", "style")); // texts between these tags are ignored
+        this.separators = new HashSet<>(Arrays.asList(' ','*', '<', '.', ':', '?', '!', ';', '-', '–', '=', '{', '}'));
     }
 
     public Map<String, Integer> createTopList() throws IOException {
-        Map<String, Integer> topList = new HashMap<>();
         for (int i = 0; i < urlList.size(); i++) {
             URL url = urlList.get(i);
-            StringBuilder text = new StringBuilder();
             BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
+            StringBuilder nextTag = new StringBuilder();
             int value;
             while ((value = reader.read()) != -1) {
                 char character = (char) value;
-                text.append(character);
-                if (character == '>' && findClosingTag(text) != null) {
-                    eatTag(text, findClosingTag(text));
+                if (character == '<') {
+                    while ((value = reader.read()) != -1) {
+                        char tagChar = (char) value;
+                        if (tagChar == '>') {
+                            break;
+                        }
+                        nextTag.append(tagChar);
+                    }
+                    eatTag(nextTag.toString(), reader); //assumption: skipTags can not be the first ones on a webpage
                 }
             }
-            processValidSubtext(text, 0, text.length());
         }
-        topList = buildTopList(freq, LENGTH_OF_TOPLIST);
+        Map <String, Integer> topList = buildTopList(freq, LENGTH_OF_TOPLIST);
         return topList;
     }
 
-    private String findClosingTag(StringBuilder text) {
-        int index = text.length() - 1;
-        String tag;
-        while (index >= 0 && text.charAt(index) != '<') {
-            index--;
-        }
-        if (index < 0) {
-            return null;
-        }
-        if (text.charAt(index + 1) == '/') {
-            tag = text.substring(index + 2, text.length() - 1);
-            tags.add(tag);
-            return tag;
-        }
-        return null;
-    }
-
-    private void eatTag(StringBuilder text, String tag) {
-        String openingTag = "<" + tag + ">";
-        int index = text.lastIndexOf(openingTag);
-        if (index < 0) { // no proper opening tag found
-            return;
-        }
-        if (skipTags.contains(tag)) { 
-            text.delete(index, text.length()); // ignore text between skipTags for processing
-            return;
-        }
-        processValidSubtext(text, index + openingTag.length(), text.length() - tag.length() - 3); //3 for </ and >
-        text.delete(index, text.length());
-        return;
-    }
-
-    private void processValidSubtext(StringBuilder text, int start, int end) {
-        String[] words = text.substring(start, end).split("[-–., :<>;=/\"\\s]+");
-        for (int j = 0; j < words.length; j++) {
-            if (!words[j].isEmpty()) freq.put(words[j], freq.getOrDefault(words[j], 0) + 1);
+    private void eatTag(String tag, BufferedReader reader) throws IOException {
+        int value;
+        StringBuilder word = new StringBuilder();
+        while ((value = reader.read()) != -1) {
+            char character = (char) value;
+            if (character == '<') {
+                int tagValue;
+                if (word.length() > 1 && !skipWords.contains(word.toString()) && !skipTags.contains(tag)) {
+                    freq.put(word.toString().toLowerCase(), freq.getOrDefault(word.toString().toLowerCase(), 0) + 1);
+                }
+                StringBuilder nextTag = new StringBuilder();
+                while ((tagValue = reader.read()) != -1) {
+                    char tagChar = (char) tagValue;
+                    if (tagChar == '>') {
+                        break;
+                    }
+                    nextTag.append(tagChar);
+                }
+                String nextTagString = nextTag.toString();
+                if (('/' + tag).equals(nextTagString)) {
+                    return;
+                }
+                if (!skipTags.contains(tag) && !nextTagString.startsWith("/")) {
+                    eatTag(nextTagString, reader);
+                }
+            }
+            if (separators.contains(character) || Character.isWhitespace(character)) {
+                if (word.length() > 1 && !skipWords.contains(word.toString()) && !skipTags.contains(tag)) {
+                    freq.put(word.toString().toLowerCase(), freq.getOrDefault(word.toString().toLowerCase(), 0) + 1);
+                }
+                word.setLength(0);
+                continue;
+            }
+            word.append(character);
         }
     }
 
-    private Map<String, Integer> buildTopList(Map<String, Integer> freq, int x) {
+    private Map<String, Integer> buildTopList(Map<String, Integer> freq, int topListLength) {
         Map<String, Integer> topList = new HashMap<>();
-        for (int i = 0; i < x; i++) {
+        for (int i = 0; i < topListLength; i++) {
             int max = 0;
             String maxKey = null;
             for (Map.Entry<String, Integer> entry : freq.entrySet()) {

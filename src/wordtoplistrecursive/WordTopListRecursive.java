@@ -23,15 +23,17 @@ public class WordTopListRecursive {
      * @param args the command line arguments
      */
     public static void main(String[] args) throws MalformedURLException, IOException {
-        System.out.println("WordTopList application started.");
+        System.out.println("WordTopListRecursive application started.");
         List<URL> urlList = new ArrayList<>();
         urlList.add(new URL("https://justinjackson.ca/words.html"));
-        System.out.print("Checked URL-s: ");
-        System.out.println(urlList.toString());
-        // WordCounter wordCounter = new WordCounter(urlList);
+        urlList.add(new URL("http://abouthungary.hu/"));
+        urlList.add(new URL("https://www.javatpoint.com/java-tutorial"));
+        urlList.add(new URL("https://www.bbc.com/"));
+        System.out.println("Checked URL-s: " + urlList);
+        WordCounter wordCounter = new WordCounter(urlList);
         Map<String, Integer> topList = new HashMap<>();
-        // topList = wordCounter.createTopList();
-        System.out.println("The most frequent words: " + topList);
+        topList = wordCounter.createTopList();
+        System.out.println("The most frequent words on the checked websites: " + topList);
     }
 
 }
